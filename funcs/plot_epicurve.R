@@ -1,3 +1,4 @@
+
 plot_epicurve <- function(data, district = "All", agegroup = "malaria_tot", facility = "All") {
   
   if (!("All" %in% district)) {
