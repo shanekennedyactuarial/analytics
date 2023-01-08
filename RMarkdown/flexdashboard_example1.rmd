@@ -1,0 +1,100 @@
+---
+title: "Outbreak dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, echo=FALSE,warning=FALSE,message=FALSE,error=FALSE}
+#https://epirhandbook.com/en/dashboards-with-r-markdown.html
+pacman::p_load(
+  rio,             # data import/export     
+  here,            # locate files
+  tidyverse,       # data management and visualization
+  flexdashboard,   # dashboard versions of R Markdown reports
+  flextable,          
+  incidence2,
+  epicontacts,
+  DT,
+  janitor
+)
+
+linelist <- import(here("data", "linelist_cleaned.rds"))
+```
+
+## Column 1 {data-width=500}
+### Summary and action items
+
+Include summary notes here
+
+### Review data
+#### Cases by Hospital
+
+```{r}
+linelist%>%
+count(hospital)%>%
+adorn_totals()%>%
+rename("Hospital" = hospital,
+      "Cases" = n)%>%
+knitr::kable()
+```
+
+## Column 1 {data-width=500}
+### Epidemic Curve by Age
+
+```{r}
+age_outbreak <- incidence(linelist, date_onset, "week", groups = age_cat)
+plot(age_outbreak, fill = age_cat, col_pal = muted, title = "") %>% 
+  plotly::ggplotly()
+```
+
+### Transmission Chain (select cases)
+```{r}
+# load packages
+pacman::p_load(epicontacts)
+
+## generate contacts
+contacts<-linelist%>%
+  transmute(
+    infector=infector,
+    case_id=case_id,
+    location=sample(c("Community","Nosocomial"),n(),TRUE),
+    duration=sample.int(10,n(),TRUE)
+  )%>%
+  drop_na(infector)
+
+## generate epicontacts object
+epic<-make_epicontacts(
+  linelist=linelist,
+  contacts=contacts,
+  id="case_id",
+  from ="infector",
+  to="case_id",
+  directed=TRUE
+)
+
+## subset epicontacts object
+sub<-epic%>%
+  subset(
+    node_attribute=list(date_onset=c(as.Date(c("2014-06-30", "2014-06-01"))))
+  )%>%
+  thin("contacts")
+
+# temporal plot
+
+plot(
+  sub,
+  #x_axis="date_onset",
+  node_color="outcome",
+  col_path=c(Death="firebrick", Recover="green"),
+  arrow_size=0.5,
+  node_size=13,
+  label=FALSE,
+  height=700,
+  width=700
+)
+
+```
+
+
